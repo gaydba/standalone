@@ -444,7 +444,7 @@ function urlify(text) {
       var height = width*0.6125;
       return '<video width="'+width+'" height="'+height+'" controls> <source src="'+url+'" type="video/mp4"></video>';
     } else if (cls == 'twitter'){
-      var twid = url.match(/\/(\d+)$/)[1];
+      var twid = url.match(/(\d+)$/)[1];
       // console.log('twid: ', twid);
       var s = document.createElement('script');
       s.type = 'text/javascript';
