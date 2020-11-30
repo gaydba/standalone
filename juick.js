@@ -443,7 +443,7 @@ function urlify(text) {
       var width = window.innerWidth <= 800? window.innerWidth : 800;
       var height = width*0.6125;
       return '<video width="'+width+'" height="'+height+'" controls> <source src="'+url+'" type="video/mp4"></video>';
-    } else if (cls == 'twitter'){
+    } else if (cls == 'twitter' && url.match(/(\d+)$/)) {
       var twid = url.match(/(\d+)$/)[1];
       // console.log('twid: ', twid);
       var s = document.createElement('script');
