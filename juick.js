@@ -29,13 +29,13 @@ function juickInit(uname) {
   for(var i=0; i<nodes.length; i++)
     nodes[i].parentNode.removeChild(nodes[i]);
   if(message && message>0) {
-    var url="http://api.juick.com/thread?mid="+message;
+    var url="//api.juick.com/thread?mid="+message;
     juickLoadScript(url, juickParseThread);
   } else if (daysback) {
-    var url = "http://api.juick.com/messages?uname="+uname+"&daysback="+daysback;
+    var url = "//api.juick.com/messages?uname="+uname+"&daysback="+daysback;
     juickLoadScript(url, juickParseMessages);
   } else {
-    var url="http://api.juick.com/messages?uname="+uname+"&withrecommended=1";
+    var url="//api.juick.com/messages?uname="+uname+"&withrecommended=1";
     if(juickTag && juickTag!='') url+="&tag="+encodeURI(juickTag);
     if(juickLastMid && juickLastMid>0) url+="&before_mid="+juickLastMid;
     juickLoadScript(url, juickParseMessages);
@@ -93,7 +93,7 @@ function juickParseMessages(json) {
         var magicLikes = Math.floor(Math.random() * 12) + 1;
 
         $.post({
-          url: 'http://api.juick.com/react',
+          url: '//api.juick.com/react',
           data: {
             mid: me.data('mid'),
             reactionId: me.data('id'),
@@ -226,7 +226,7 @@ function juickParseMessages(json) {
 
 function insertTimehop(id, daysback) {
   // console.log(id);
-  var durl = "http://api.juick.com/messages?uname="+juickName+"&daysback="+daysback;
+  var durl = "//api.juick.com/messages?uname="+juickName+"&daysback="+daysback;
   console.log(durl);
   $.getJSON( durl).done(function( data ) {
     if (data.length>0) {
