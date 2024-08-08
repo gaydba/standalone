@@ -11,7 +11,6 @@ function setRandomTopic() {
 
 function juickInit(uname) {
   setRandomTopic();
-  initDisquss();
   var message=juickGetHashVar("message");
   daysback=juickGetHashVar("daysback");
   juickTag=juickGetHashVar("tag");
@@ -261,31 +260,6 @@ function juickParseThread(json) {
     li.innerHTML=ihtml;
     replies.appendChild(li);
   }
-  addDisquss(replies, msg[0].mid);
-}
-
-function initDisquss() {
-  (function() { // DON'T EDIT BELOW THIS LINE
-    var d = document, s = d.createElement('script');
-    s.src = 'https://netneladno-ru.disqus.com/embed.js';
-    s.setAttribute('data-timestamp', +new Date());
-    (d.head || d.body).appendChild(s);
-  })();
-}
-
-function addDisquss(parent, mid) {
-  $('#disqus_thread').remove();
-  var disq=document.createElement("div");
-  disq.innerHTML='<div id="disqus_thread"></div>';
-  parent.appendChild(disq);
-  var dconf = function () {
-    this.page.identifier = 'thread_'+mid;
-    this.page.url = 'http://netneladno.ru/#!'+mid;  // Replace PAGE_URL with your page's canonical URL variable
-  };
-  DISQUS.reset({
-    reload: true,
-    config: dconf
-  });
 }
 
 function juickGetHashVar(variable) {
