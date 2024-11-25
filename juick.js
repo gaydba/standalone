@@ -303,7 +303,7 @@ function classify(url){
     return 'imgur'
   } else if (/coub.com\/view/.test(url)){
     return 'coub'
-  } else if (/twitter.com\/.*\/status/.test(url)){
+  } else if (/(twitter|x).com\/.*\/status/.test(url)){
     return 'twitter'
   } else if (/gfycat.com/.test(url)){
     return 'gfycat'
@@ -420,6 +420,7 @@ function urlify(text) {
     } else if (cls == 'twitter' && url.match(/(\d+)$/)) {
       var twid = url.match(/(\d+)$/)[1];
       // console.log('twid: ', twid);
+      const twitterUrl = url.replace('x.com', 'twitter.com');
       var s = document.createElement('script');
       s.type = 'text/javascript';
       s.src = 'https://platform.twitter.com/widgets.js';
@@ -428,7 +429,7 @@ function urlify(text) {
         // console.info('Append ', s, ' to ', document.body);
         document.body.appendChild(s);
       }, 300);
-      return '<blockquote class="twitter-tweet"><a href="'+url+'"></a></blockquote>';
+      return '<blockquote class="twitter-tweet"><a href="'+twitterUrl+'"></a></blockquote>';
     } else if (cls == 'reddit'){
       var s = document.createElement('script');
       s.type = 'text/javascript';
