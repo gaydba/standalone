@@ -91,16 +91,11 @@ h1 a:visited {
 }
 #messages .timehop {
     background: #F0F0F0;
-    border-bottom: 1px solid #CCC;
+    border: 1px solid #CCC;
     margin: 0 0 1em 0;
     padding: 0.5em;
     font-size: x-large;
     text-align: center;
-    border: 1px
-}
-#messages .replies {
-    text-align: right;
-    font-size: 14px
 }
 #messages .tags {
     list-style-type: none;
@@ -116,9 +111,6 @@ h1 a:visited {
     text-decoration: none;
     border-bottom: 1px dashed #999;
 }
-#messages .embed .provider {
-    display: none;
-}
 #replies {
     list-style-type: none;
     margin: 0;
@@ -132,32 +124,6 @@ h1 a:visited {
 #replies .username {
     font-size: larger;
 }
-#navigation {
-    background: #F0F0F0;
-    margin: 2em 0;
-    padding: 5px;
-}
-
-#navigation .bottomnav {
-    display: flex;
-    justify-content: center;
-    height: 50px;
-}
-
-#navigation .bottomnav .random {
-    flex: 0;
-}
-
-#navigation .bottomnav .random a img {
-    position: absolute;
-}
-
-#navigation .bottomnav .next {
-    align-self: center;
-    text-align: center;
-    flex: 1;
-}
-
 #footer {
     margin: 2em 0 0 0;
     padding: 5px;
@@ -179,26 +145,7 @@ h1 a:visited {
 }
 
 @media (min-width: 600px) {
-    #messages .meta {
-        float: bottom;
-        font-size: 14px;
-        color: #999;
-        text-align: right;
-        display: flex;
-    }
-    #messages .meta .likes{
-        align-self: end;
-        display: flex;
-        justify-content: center;
-        flex-wrap: wrap;
-        align-content: space-between;
+    #messages .meta .likes {
         flex: 1;
-        margin: 10px 0 0 0;
     }
-    #messages .meta .timestamp {
-        font-size: 14px;
-        margin: 10px 10px 0 0;
-        color: #999;
-    }
-
 }
