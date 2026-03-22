@@ -270,29 +270,6 @@ async function randomDay(retries = 0) {
 
 // --- Embeds ---
 
-function hideDeadPost(el) {
-  const li = el.closest('li');
-  if (!li) return;
-  // убираем соседний timehop если есть
-  const next = li.nextElementSibling;
-  if (next && next.querySelector('.timehop')) {
-    next.style.display = 'none';
-  } else {
-    const prev = li.previousElementSibling;
-    if (prev && prev.querySelector('.timehop')) prev.style.display = 'none';
-  }
-  li.style.display = 'none';
-}
-
-function hideDeadEmbeds() {
-  document.querySelectorAll('.twitter-tweet').forEach(el => hideDeadPost(el));
-  document.querySelectorAll('.imgur-embed-pub').forEach(el => {
-    if (!el.nextElementSibling || el.nextElementSibling.tagName !== 'IFRAME') {
-      hideDeadPost(el);
-    }
-  });
-}
-
 function loadEmbedScripts() {
   if (document.querySelector('.twitter-tweet')) {
     loadScriptOnce('https://platform.twitter.com/widgets.js', () => {
@@ -305,7 +282,6 @@ function loadEmbedScripts() {
     loadScriptOnce('https://embed.redditmedia.com/widgets/platform.js');
   if (document.querySelector('.instagram-media'))
     loadScriptOnce('https://platform.instagram.com/en_US/embeds.js');
-  setTimeout(hideDeadEmbeds, 5000);
 }
 
 // --- Text formatting ---
