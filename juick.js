@@ -270,13 +270,25 @@ async function randomDay(retries = 0) {
 
 // --- Embeds ---
 
+function hideDeadPost(el) {
+  const li = el.closest('li');
+  if (!li) return;
+  // убираем соседний timehop если есть
+  const next = li.nextElementSibling;
+  if (next && next.querySelector('.timehop')) {
+    next.style.display = 'none';
+  } else {
+    const prev = li.previousElementSibling;
+    if (prev && prev.querySelector('.timehop')) prev.style.display = 'none';
+  }
+  li.style.display = 'none';
+}
+
 function hideDeadEmbeds() {
-  document.querySelectorAll('.twitter-tweet').forEach(el => {
-    el.closest('li').style.display = 'none';
-  });
+  document.querySelectorAll('.twitter-tweet').forEach(el => hideDeadPost(el));
   document.querySelectorAll('.imgur-embed-pub').forEach(el => {
     if (!el.nextElementSibling || el.nextElementSibling.tagName !== 'IFRAME') {
-      el.closest('li').style.display = 'none';
+      hideDeadPost(el);
     }
   });
 }
