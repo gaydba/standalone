@@ -47,7 +47,6 @@ h1 a:visited {
     margin-bottom: 5em;
 }
 #messages .meta {
-    float: bottom;
     font-size: 14px;
     color: #999;
     text-align: right;
@@ -60,6 +59,15 @@ h1 a:visited {
     flex-wrap: wrap;
     align-content: space-between;
     margin: 10px 0 0 0;
+}
+@media (hover: hover) {
+    #messages .meta .likes {
+        opacity: 0;
+        transition: opacity 0.2s;
+    }
+    #messages li:hover .meta .likes {
+        opacity: 1;
+    }
 }
 #messages .meta .likes-pair {
     padding: 0 16px 0 0;

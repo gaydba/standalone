@@ -1,40 +1,92 @@
+var juickApi = location.hostname === 'localhost' ? '/api' : '//api.juick.com';
 var juickTag;
 var juickLastMid;
-var daysback;
 var maxMid=0;
+var isLoading=false;
+var currentTag='';
+var feedCache=null;
+
+window.addEventListener('scroll', function() {
+  if (isLoading) return;
+  if (juickGetHashVar("message")) return;
+  if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 2000) {
+    isLoading = true;
+    var url = juickApi+"/messages?uname="+juickName+"&withrecommended=1&before_mid="+juickLastMid;
+    if (currentTag) url += "&tag="+encodeURI(currentTag);
+    juickLoadScript(url, function(json) {
+      if (json.length > 0) juickAppendMessages(json);
+      isLoading = false;
+    });
+  }
+});
+
+document.addEventListener('click', function(e) {
+  var el = e.target.closest('.like');
+  if (!el) return;
+  e.preventDefault();
+  if (el._requestRunning) return;
+  el._requestRunning = true;
+  var magicLikes = Math.floor(Math.random() * 12) + 1;
+  var mid = el.getAttribute('data-mid');
+  var reactionId = el.getAttribute('data-id');
+  var likesCounterId = mid + reactionId;
+  var counter = document.getElementById(likesCounterId);
+  var val = parseInt(counter.textContent) || 0;
+  counter.textContent = (val + magicLikes) + ' ';
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', juickApi+'/react', true);
+  xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+  xhr.onloadend = function() { el._requestRunning = false; };
+  xhr.send('mid=' + mid + '&reactionId=' + reactionId + '&hash=7DIS7WEOA0XQPG5Y&count=' + magicLikes);
+});
 
 function setRandomTopic() {
   var title = titles[Math.floor(Math.random()*titles.length)];
-  // console.log('New title: ' + title);
-  $('#hdr-text').text(title);
+  document.getElementById('hdr-text').textContent = title;
 }
 
 function juickInit(uname) {
   setRandomTopic();
+  isLoading = false;
   var message=juickGetHashVar("message");
-  daysback=juickGetHashVar("daysback");
   juickTag=juickGetHashVar("tag");
   juickLastMid=juickGetHashVar("before_mid");
   if(juickLastMid) juickLastMid=parseInt(juickLastMid);
   if(!juickLastMid) juickLastMid=0;
 
   var msgs=document.getElementById("messages");
-  while(msgs.hasChildNodes()) msgs.removeChild(msgs.lastChild);
   var replies=document.getElementById("replies");
-  while(replies.hasChildNodes()) replies.removeChild(replies.lastChild);
-  document.getElementById("navigation").style.display="none";
 
-  var nodes=document.getElementsByClassName("loadScript");
-  for(var i=0; i<nodes.length; i++)
-    nodes[i].parentNode.removeChild(nodes[i]);
   if(message && message>0) {
-    var url="//api.juick.com/thread?mid="+message;
+    // сохраняем ленту перед открытием треда
+    if (msgs.childNodes.length > 0) {
+      feedCache = {
+        html: msgs.innerHTML,
+        scrollY: window.scrollY,
+        lastMid: juickLastMid,
+        tag: currentTag,
+        prevdate: prevdate
+      };
+    }
+    while(msgs.hasChildNodes()) msgs.removeChild(msgs.lastChild);
+    while(replies.hasChildNodes()) replies.removeChild(replies.lastChild);
+    var url=juickApi+"/thread?mid="+message;
     juickLoadScript(url, juickParseThread);
-  } else if (daysback) {
-    var url = "//api.juick.com/messages?uname="+uname+"&daysback="+daysback;
-    juickLoadScript(url, juickParseMessages);
+  } else if (feedCache) {
+    // возврат из треда — восстанавливаем ленту
+    while(replies.hasChildNodes()) replies.removeChild(replies.lastChild);
+    msgs.innerHTML = feedCache.html;
+    juickLastMid = feedCache.lastMid;
+    currentTag = feedCache.tag;
+    prevdate = feedCache.prevdate;
+    var scrollY = feedCache.scrollY;
+    feedCache = null;
+    setTimeout(function(){ window.scrollTo(0, scrollY); }, 0);
   } else {
-    var url="//api.juick.com/messages?uname="+uname+"&withrecommended=1";
+    feedCache = null;
+    while(msgs.hasChildNodes()) msgs.removeChild(msgs.lastChild);
+    while(replies.hasChildNodes()) replies.removeChild(replies.lastChild);
+    var url=juickApi+"/messages?uname="+uname+"&withrecommended=1";
     if(juickTag && juickTag!='') url+="&tag="+encodeURI(juickTag);
     if(juickLastMid && juickLastMid>0) url+="&before_mid="+juickLastMid;
     juickLoadScript(url, juickParseMessages);
@@ -43,14 +95,27 @@ function juickInit(uname) {
 
 function juickLoadScript(url, callback) {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, false);
+    xhr.open('GET', url, true);
+    xhr.onload = function() {
+        callback(JSON.parse(xhr.responseText));
+    };
     xhr.send();
-    callback(JSON.parse(xhr.responseText));
 }
 
-function juickParseMessages(json) {
+var likesDef = {
+  1: {count: 0, description: "like", emoji: "em---1"},
+  2: {count: 0, description: "love", emoji:"em-heart_eyes"},
+  3: {count: 0, description: "lol", emoji:"em-joy"},
+  4: {count: 0, description: "hmm", emoji:"em-thinking_face"},
+  5: {count: 0, description: "angry", emoji:"em-rage"},
+  6: {count: 0, description: "uhblya", emoji:"em-six_pointed_star"},
+  7: {count: 0, description: "ugh", emoji:"em-cry"}
+};
+
+var prevdate='';
+
+function juickAppendMessages(json) {
   var msgs=document.getElementById("messages");
-  var prevdate='';
   for(var i=0; i<json.length; i++) {
     juickLastMid = json[i].mid;
     if (maxMid < juickLastMid) maxMid=parseInt(juickLastMid);
@@ -69,7 +134,7 @@ function juickParseMessages(json) {
 
     ihtml+='<div class="text">';
     if(json[i].photo)
-      ihtml+='<div class="photo"><a href="'+json[i].attachment.url+'"><img src="'+json[i].attachment.url+'" alt="Photo"/></a></div>';
+      ihtml+='<div class="photo"><a href="'+json[i].attachment.url+'"><img loading="lazy" src="'+json[i].attachment.url+'" alt="Photo"/></a></div>';
     if(json[i].video)
       ihtml+='<b>Attachment:</b> <a href="'+json[i].video.mp4+'">Video</a><br/>';
     if(json[i].location)
@@ -77,86 +142,27 @@ function juickParseMessages(json) {
     ihtml+=juickFormatText(json[i].body || "");
     ihtml+='</div>';
 
-
-
-    $(function() {
-      $(".like").click(function (e) {
-        var me = $(this);
-        e.preventDefault();
-
-        if (me.data('requestRunning')) {
-          return;
-        }
-
-        me.data('requestRunning', true);
-        var magicLikes = Math.floor(Math.random() * 12) + 1;
-
-        $.post({
-          url: '//api.juick.com/react',
-          data: {
-            mid: me.data('mid'),
-            reactionId: me.data('id'),
-            hash: '7DIS7WEOA0XQPG5Y',
-            count: magicLikes
-          },
-          success: function (text) {
-            var likesCounterId = me.data('mid').toString() + me.data('id').toString();
-            var likesCounterVal = parseInt(document.getElementById(likesCounterId).textContent);
-            if (isNaN(likesCounterVal)) {
-              likesCounterVal = 0;
-            }
-            document.getElementById(likesCounterId).textContent = (likesCounterVal + magicLikes).toString() + ' ';
-            //console.log('Success post, count:', likesCounterId, likesCounterVal, document.getElementById(likesCounterId));
-          },
-          complete: function () {
-            me.data('requestRunning', false);
-          }
-        })
-      });
-    });
-
-    var likesDef = {
-      1: {count: 0, description: "like", emoji: "em---1"},
-      2: {count: 0, description: "love", emoji:"em-heart_eyes"},
-      3: {count: 0, description: "lol", emoji:"em-joy"},
-      4: {count: 0, description: "hmm", emoji:"em-thinking_face"},
-      5: {count: 0, description: "angry", emoji:"em-rage"},
-      6: {count: 0, description: "uhblya", emoji:"em-six_pointed_star"},
-      7: {count: 0, description: "ugh", emoji:"em-cry"}
-    };
-
-
     var serverLikes = {};
-
     if(json[i].reactions){
       var likesAvailable = json[i].reactions;
-
       for (var q=0; q< likesAvailable.length; q++){
-        var id = likesAvailable[q].id;
-        serverLikes[id] = likesAvailable[q]
+        serverLikes[likesAvailable[q].id] = likesAvailable[q];
       }
     }
 
-
     var likes = '';
     for (var a = 1; a < 8; a++){
-
       var count = " ";
-      if(json[i].reactions){
-        if( a in serverLikes){
-          var count = serverLikes[a].count;
-        }
+      if(json[i].reactions && a in serverLikes){
+        count = serverLikes[a].count;
       }
-
       likes += '<span class="likes-pair"><a class="like" data-id="' + a + '" data-mid="' + json[i].mid + '">'
               + '<i class="em '+likesDef[a].emoji +'"></i></a>'
               + '<span class="counter" id="' + json[i].mid + a + '">' + count + ' ' + '</span></span>';
     }
 
-
     ihtml += '<div class="meta">';
     if (!juickGetHashVar("message")) {
-
       ihtml+='<span class="likes" >'+ likes+
           '</span><span class="timestamp"><a href="#message='+json[i].mid+'">'+currdate+'</a></span></div>';
     } else { ihtml+='<span class="timestamp">' + currdate+'</span></div>'; }
@@ -165,9 +171,9 @@ function juickParseMessages(json) {
 
     var li=document.createElement("li");
     li.innerHTML=ihtml;
-
     msgs.appendChild(li);
-    if (currdate != prevdate & prevdate != '' & !(daysback>0)) {
+
+    if (currdate != prevdate & prevdate != '' & i > 0) {
       var pts=json[i-1].timestamp.split(/[\-\s]/);
       var pdate=new Date(pts[0],pts[1]-1,pts[2]).getTime();
       now=new Date().getTime();
@@ -177,64 +183,48 @@ function juickParseMessages(json) {
     prevdate=currdate;
   }
 
-  var random_mid = (Math.floor(Math.random()*(maxMid-427988+1)+427988));
-  var nav='<div class=bottomnav><span class="random"><a href="#before_mid='+random_mid+'"><img src="rsz_shuffle.png"></a></span>';
-  var topnav='<a href="#before_mid='+random_mid+'"><img src="rsz_shuffle.png"></a>';
-  $('#topnavbutton').html(topnav);
+  var topnav='<a href="#" onclick="randomDay();return false"><img src="rsz_shuffle.png"></a>';
+  document.getElementById('topnavbutton').innerHTML = topnav;
+  loadEmbedScripts();
+}
 
-  if (juickGetHashVar("before_mid") || (!window.location.hash)) {
-    nav+='<span class="next"><a href="#before_mid='+(juickLastMid)+'">'+juickOlder+'</a></span>';
-  } else if (juickTag && juickTag!='') {
-    nav+='<span class="next"><a href="#tag='+juickTag+'&before_mid='+(juickLastMid)+'">'+juickOlder+'</a></span>';
-  } else if(json.length>=1 && daysback>0) {
-    nav+='<span class="next"><a href="#before_mid='+(juickLastMid)+'">'+juickOlder+'</a></span>';
-  } else if (daysback>0) {
-    nav='<div class="timehop"><a class="next" href="#daysback='+(parseInt(daysback)+1)+'">Пожалуй надо еще денек отмотать!</a></div>';
-  }
-  nav+='</div>';
+function juickParseMessages(json) {
+  prevdate='';
+  currentTag = juickTag || '';
+  juickAppendMessages(json);
+}
 
-  if(nav!="") {
-    document.getElementById("navigation").innerHTML=nav;
-    document.getElementById("navigation").style.display="block";
-  }
-  var width = window.innerWidth <= 800? window.innerWidth : 800;
-  // $('.media').embedly({
-  //   key: '28b3d1f4d2484dae8d8dc203320dd253',
-  //   query: {
-  //     maxwidth: width
-  //   }
-  // });
-
-  // $(function () {
-  //   var currentHash = "#";
-  //   var blocksArr = $('.post');
-
-  //   $(document).scroll(function () {
-  //     var currentTop = window.pageYOffset/1;
-  //     for (var i=0; i < blocksArr.length; i++){
-  //       var currentElementTop = $(blocksArr[i]).offset().top;
-  //       var hash = '#before_mid='+$(blocksArr[i-1]).attr('id');
-  //       if (currentElementTop < currentTop && currentTop < currentElementTop + $(blocksArr[i]).height() && currentHash!=hash && i>0){
-  //         history.pushState(null, null, hash);
-  //       }
-  //       currentHash = hash;
-  //     }
-  //   });
-  // });
+function randomDay(retries) {
+  retries = retries || 0;
+  if (retries > 10) { window.location.hash = '#'; return; }
+  var maxDays = Math.floor((Date.now() - new Date(2009,11,17).getTime()) / 86400000);
+  var day = Math.floor(Math.random() * maxDays) + 1;
+  juickLoadScript(juickApi+"/messages?uname="+juickName+"&daysback="+day, function(json) {
+    if (json.length > 0) {
+      window.location.hash = '#before_mid=' + (parseInt(json[0].mid) + 1);
+    } else {
+      randomDay(retries + 1);
+    }
+  });
 }
 
 function insertTimehop(id, daysback) {
-  // console.log(id);
-  var durl = "//api.juick.com/messages?uname="+juickName+"&daysback="+daysback;
-  console.log(durl);
-  $.getJSON( durl).done(function( data ) {
-    if (data.length>0) {
-      // console.log(data);
-      var timehop=document.createElement("li");
-      timehop.innerHTML='<div class="timehop"><a href="#daysback='+daysback+'">Этот день год назад.</a></div>';
-      $('#'+id).parent().after(timehop);
+  var durl = juickApi+"/messages?uname="+juickName+"&daysback="+daysback;
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', durl, true);
+  xhr.onload = function() {
+    var data = JSON.parse(xhr.responseText);
+    if (data.length > 0) {
+      var mid = parseInt(data[0].mid) + 1;
+      var timehop = document.createElement("li");
+      timehop.innerHTML = '<div class="timehop"><a href="#before_mid='+mid+'">Этот день год назад.</a></div>';
+      var post = document.getElementById(id);
+      if (post && post.parentNode) {
+        post.parentNode.parentNode.insertBefore(timehop, post.parentNode.nextSibling);
+      }
     }
-  });
+  };
+  xhr.send();
 }
 
 function juickParseThread(json) {
@@ -274,12 +264,14 @@ function juickGetHashVar(variable) {
   }
 }
 
+function escapeHtml(txt) {
+  return txt.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
 function juickFormatText(txt) {
-  //console.log(txt);
-  //txt=txt.replace("<","&lt;").replace(">","&gt;").replace("\"","&quot;");
-  txt=txt.replace(/\n/g,"<br/>");
+  txt = escapeHtml(txt);
+  txt = txt.replace(/\n/g,"<br/>");
   txt = urlify(txt);
-  //console.log('After urlify: ', txt)
   return txt;
 }
 
@@ -352,7 +344,6 @@ function get_youtube_time(url) {
 }
 
 function get_imgurid(url){
-  // console.log(url);
     var r = /imgur.com\/(?:gallery\/)?(?:a\/)?(\w+)(?:\..+)?/;
   if (r.test(url)) {
     var i = url.match(r)[1];
@@ -366,6 +357,64 @@ function get_imgurid(url){
   }
 }
 
+var loadedScripts = {};
+function loadScriptOnce(src, onload) {
+  if (loadedScripts[src]) {
+    if (onload) onload();
+    return;
+  }
+  loadedScripts[src] = true;
+  var s = document.createElement('script');
+  s.src = src;
+  s.async = true;
+  if (onload) s.onload = onload;
+  document.body.appendChild(s);
+}
+
+function hideDeadEmbeds() {
+  // twitter: если blockquote не заменён на iframe — твит протух
+  document.querySelectorAll('.twitter-tweet').forEach(function(el) {
+    el.closest('li').style.display = 'none';
+  });
+  // imgur: blockquote без iframe внутри
+  document.querySelectorAll('.imgur-embed-pub').forEach(function(el) {
+    if (!el.nextElementSibling || el.nextElementSibling.tagName !== 'IFRAME') {
+      el.closest('li').style.display = 'none';
+    }
+  });
+}
+
+function loadEmbedScripts() {
+  if (document.querySelector('.twitter-tweet'))
+    loadScriptOnce('https://platform.twitter.com/widgets.js', function() {
+      if (window.twttr && twttr.widgets) twttr.widgets.load();
+    });
+  if (document.querySelector('.imgur-embed-pub'))
+    loadScriptOnce('https://s.imgur.com/min/embed.js');
+  if (document.querySelector('.reddit-card'))
+    loadScriptOnce('https://embed.redditmedia.com/widgets/platform.js');
+  if (document.querySelector('.instagram-media'))
+    loadScriptOnce('https://platform.instagram.com/en_US/embeds.js');
+  setTimeout(hideDeadEmbeds, 5000);
+}
+
+document.addEventListener('click', function(e) {
+  var facade = e.target.closest('.yt-facade');
+  if (!facade) return;
+  var yid = facade.getAttribute('data-id');
+  var start = facade.getAttribute('data-start') || 0;
+  var width = facade.offsetWidth;
+  var height = facade.offsetHeight;
+  var iframe = document.createElement('iframe');
+  iframe.width = width;
+  iframe.height = height;
+  iframe.src = 'https://www.youtube.com/embed/' + yid + '?rel=0&start=' + start + '&autoplay=1';
+  iframe.frameBorder = '0';
+  iframe.allow = 'autoplay; encrypted-media';
+  iframe.allowFullscreen = true;
+  facade.replaceWith(iframe);
+});
+
 function urlify(text) {
   var adiumUrlRegex = /<((https?|ftp)(:\/\/[^\s()<>]+))>/g;
   if (adiumUrlRegex.test(text)){
@@ -378,79 +427,40 @@ function urlify(text) {
   return text.replace(urlRegex, function(url) {
     var cls = classify(url);
   if (cls == 'image'){
-      return '<div class="div_a_pic"><a class="a_pic" href="' + url + '">' + '<img src="'+url+'"style="position: relative; margin: auto;" onerror="this.parentNode.parentNode.parentNode.parentNode.style.display=\'none\';"/></a></div>';
+      return '<div class="div_a_pic"><a class="a_pic" href="' + url + '">' + '<img loading="lazy" src="'+url+'" style="position: relative; margin: auto;" onerror="this.parentNode.parentNode.parentNode.parentNode.style.display=\'none\';"/></a></div>';
     } else if (cls == 'youtube' && get_youtubeid(url)){
       var yid = get_youtubeid(url);
-      // console.log('youtube link: ', url);
-      // console.log('youtube video id: ', yid);
       if (url.match(/t=(.*)$/)) {
         var timeoffset = get_youtube_time(url);
       } else var timeoffset=0;
       var width = window.innerWidth <= 800? window.innerWidth : 800;
       var height = width*0.6125;
-      return `<iframe width="${width}" height="${height}" src="https://www.youtube.com/embed/${yid}?rel=0&amp;start=${timeoffset}" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      return `<div class="yt-facade" data-id="${yid}" data-start="${timeoffset}" style="background:url(https://i.ytimg.com/vi/${yid}/hqdefault.jpg) center/cover no-repeat;cursor:pointer;width:${width}px;height:${height}px;position:relative;"><div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:64px;color:#fff;text-shadow:0 0 8px rgba(0,0,0,.6);">&#9654;</div></div>`;
     } else if (cls == 'coub') {
       var coub_id = url.match(/coub.com\/view\/(.*)/)[1];
-      return `<div><div style="left: 0px; width: 100%; height: 0px; position: relative; padding-bottom: 56.249%;"><iframe src="http://coub.com/embed/${coub_id}" frameborder="0" allowfullscreen="" scrolling="no" style="top: 0px; left: 0px; width: 100%; height: 100%; position: absolute;"></iframe></div></div>`;
+      return `<div><div style="left: 0px; width: 100%; height: 0px; position: relative; padding-bottom: 56.249%;"><iframe loading="lazy" src="https://coub.com/embed/${coub_id}" frameborder="0" allowfullscreen="" scrolling="no" style="top: 0px; left: 0px; width: 100%; height: 100%; position: absolute;"></iframe></div></div>`;
     } else if (cls == 'media') {
       return '<a class="media" href="' + url + '">'+decodeURIComponent(url)+'</a>';
     } else if (cls == 'gfycat') {
       let data_id = url.match(/gfycat.com\/(.*)/)[1];
-      return `<div style='position:relative;padding-bottom:100%'><iframe src='https://gfycat.com/ifr/${data_id}' frameborder='0' scrolling='no' width='100%' height='100%' style='position:absolute;top:0;left:0;' allowfullscreen></iframe></div>`;
+      return `<div style='position:relative;padding-bottom:100%'><iframe loading="lazy" src='https://gfycat.com/ifr/${data_id}' frameborder='0' scrolling='no' width='100%' height='100%' style='position:absolute;top:0;left:0;' allowfullscreen></iframe></div>`;
     } else if (cls == 'vimeo') {
       var vimeo_id = url.match(/vimeo.com\/(.*)/)[1];
-      return `<div><div style="left: 0px; width: 100%; height: 0px; position: relative; padding-bottom: 67.499%;"><iframe src="https://player.vimeo.com/video/${vimeo_id}" frameborder="0" allowfullscreen="" scrolling="no" style="top: 0px; left: 0px; width: 100%; height: 100%; position: absolute;"></iframe></div></div>`;
+      return `<div><div style="left: 0px; width: 100%; height: 0px; position: relative; padding-bottom: 67.499%;"><iframe loading="lazy" src="https://player.vimeo.com/video/${vimeo_id}" frameborder="0" allowfullscreen="" scrolling="no" style="top: 0px; left: 0px; width: 100%; height: 100%; position: absolute;"></iframe></div></div>`;
     } else if (cls == 'imgur'){
       var iid = get_imgurid(url);
-      // console.log('iid: ', iid);
-      var a = '<blockquote class="imgur-embed-pub" lang="en" data-id="' + iid + '"></blockquote>';
-      var s = document.createElement('script');
-      s.type = 'text/javascript';
-      s.src = 'http://s.imgur.com/min/embed.js';
-      s.async = true;
-      setTimeout(function(){
-        // console.info('Append ', s, ' to ', document.body);
-        document.body.appendChild(s);
-      }, 300);
-      return a
+      return '<blockquote class="imgur-embed-pub" lang="en" data-id="' + iid + '"></blockquote>';
     } else if (cls == 'video') {
       var width = window.innerWidth <= 800? window.innerWidth : 800;
       var height = width*0.6125;
-      return '<video width="'+width+'" height="'+height+'" controls> <source src="'+url+'" type="video/mp4"></video>';
+      return '<video width="'+width+'" height="'+height+'" controls preload="none"> <source src="'+url+'" type="video/mp4"></video>';
     } else if (cls == 'twitter' && url.match(/(\d+)$/)) {
-      var twid = url.match(/(\d+)$/)[1];
-      // console.log('twid: ', twid);
       const twitterUrl = url.replace('x.com', 'twitter.com');
-      var s = document.createElement('script');
-      s.type = 'text/javascript';
-      s.src = 'https://platform.twitter.com/widgets.js';
-      s.async = true;
-      setTimeout(function(){
-        // console.info('Append ', s, ' to ', document.body);
-        document.body.appendChild(s);
-      }, 300);
       return '<blockquote class="twitter-tweet"><a href="'+twitterUrl+'"></a></blockquote>';
     } else if (cls == 'reddit'){
-      var s = document.createElement('script');
-      s.type = 'text/javascript';
-      s.src = 'https://embed.redditmedia.com/widgets/platform.js';
-      s.async = true;
-      setTimeout(function(){
-        // console.info('Append ', s, ' to ', document.body);
-        document.body.appendChild(s);
-      }, 300);
       return '<blockquote class="reddit-card"><a href="'+url+'"></a></blockquote>';
     } else if (cls == 'instagram'){
       var width = window.innerWidth <= 800? window.innerWidth : 800;
-      var height = width*0.6125;
-      var s = document.createElement('script');
-      s.type = 'text/javascript';
-      s.src = 'https://platform.instagram.com/en_US/embeds.js';
-      s.async = true;
-      setTimeout(function(){
-        // console.info('Append ', s, ' to ', document.body);
-        document.body.appendChild(s);
-      }, 300);
       return '<blockquote class="instagram-media" style="width:'+width+'px" ><a href="'+url+'"></a></blockquote>';
     } else {
       return '<a class="a_other" href="' + url + '">'+decodeURIComponent(url)+'</a>';
